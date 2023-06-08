@@ -8,15 +8,17 @@
 import Foundation
 import Valet
 import CryptoSwift
+import NetShears
 
-public struct AuthKit {
+public class AuthKit {
     
     // MARK: - Variables
     private let bundle: String
     private let prompt: String
-    private let method: AuthenticationMethod
+    private let baseURL: URL
+    private var method: AuthenticationMethod
     
-    private var bearerToken: String? {
+    internal var bearerToken: String? {
         return try? keychain?.string(forKey: "bearer_token")
     }
     
@@ -36,45 +38,60 @@ public struct AuthKit {
     
     /// Indicates whether a user is authenticated or not
     public var isAuthenticated: Bool {
-        return bearerToken != nil
+        switch method {
+        case .basic:
+            let modifier = NetShears.shared.modifiedList().first(where: { $0 is BasicRequestModifier }) as? BasicRequestModifier
+            return modifier != nil && !modifier!.email.isEmpty && !modifier!.password.isEmpty
+        default:
+            return bearerToken != nil
+        }
     }
     
     // MARK: - Initializers
-    public init(bundle: String, prompt: String, method: AuthenticationMethod) {
+    public init(bundle: String, prompt: String, method: AuthenticationMethod, baseURL: URL) {
         self.bundle = bundle
         self.prompt = prompt
         self.method = method
+        self.baseURL = baseURL
+        setupBearerAuthorization()
     }
     
     // MARK: - Authenticate
     /// Authenticates a user using email and password
     /// - Parameters:
-    ///   - url: URL the refresh token endpoint can be found at
+    ///   - path: URL path the refresh token endpoint can be found at
     ///   - email: Email for the user
     ///   - password: Password for the user
-    public func authenticate(url: URL, email: String, password: String) async throws {
+    public func authenticate(path: String, email: String, password: String) async throws {
         switch method {
-        case .passport(let clientId, let clientSecret):
-            try await authenticate(url: url, body: .init(email: email, password: password, clientID: clientId, clientSecret: clientSecret))
-        case .sanctum(let email, let password):
-            try await authenticate(url: url, body: .init(email: email, password: password))
+        case .oAuth(let clientId, let clientSecret):
+            try await authenticate(path: path, body: .init(username: email, password: password, clientID: clientId, clientSecret: clientSecret))
+        case .sanctum:
+            try await authenticate(path: path, body: .init(email: email, password: password))
+        case .basic:
+            self.method = .basic
+            self.setupBasicAuthorization(email: email, password: password)
         }
         NotificationCenter.default.post(name: .authenticated, object: nil)
     }
     
-    private func authenticate(url: URL, body: PassportAuthRequest) async throws {
-        var request = URLRequest(url: url)
+    private func authenticate(path: String, body: OAuthAuthRequest) async throws {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
         return try await withCheckedThrowingContinuation({ continuation in
-            URLSession.shared.dataTask(with: request) { data, response, error in
+            URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
                 do {
                     guard error == nil else { throw error! }
+                    guard let urlResponse = response as? HTTPURLResponse else { throw "Invalid Response" }
+                    if !Array(200..<300).contains(urlResponse.statusCode) { throw "Email address or password was incorrect." }
                     guard let data = data else { throw "Invalid Response" }
-                    let response = try JSONDecoder().decode(PassportAuthResponse.self, from: data)
-                    try keychain?.setString(response.accessToken, forKey: "bearer_token")
-                    try enclave?.setString(response.refreshToken, forKey: "refresh_token")
+                    let response = try JSONDecoder().decode(OAuthAuthResponse.self, from: data)
+                    try self?.keychain?.setString(response.accessToken, forKey: "bearer_token")
+                    self?.setupBearerAuthorization()
+                    try self?.enclave?.setString(response.refreshToken, forKey: "refresh_token")
+                    continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -82,19 +99,23 @@ public struct AuthKit {
         })
     }
     
-    private func authenticate(url: URL, body: SanctumAuthRequest) async throws {
-        var request = URLRequest(url: url)
+    private func authenticate(path: String, body: SanctumAuthRequest) async throws {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
         return try await withCheckedThrowingContinuation({ continuation in
-            URLSession.shared.dataTask(with: request) { data, response, error in
+            URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
                 do {
                     guard error == nil else { throw error! }
+                    guard let urlResponse = response as? HTTPURLResponse else { throw "Invalid Response" }
+                    if !Array(200..<300).contains(urlResponse.statusCode) { throw "Email address or password was incorrect." }
                     guard let data = data else { throw "Invalid Response" }
                     let response = try JSONDecoder().decode(SanctumAuthResponse.self, from: data)
-                    try keychain?.setString(response.token, forKey: "bearer_token")
-                    try enclave?.removeObject(forKey: "refresh_token")
+                    try self?.keychain?.setString(response.token, forKey: "bearer_token")
+                    self?.setupBearerAuthorization()
+                    try self?.enclave?.removeObject(forKey: "refresh_token")
+                    continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -103,27 +124,36 @@ public struct AuthKit {
     }
     
     // MARK: - Reauthenticate
-    /// Reauthenticates user using passport refresh token
+    /// Reauthenticates user using oAuth refresh token
     /// - Parameters:
     ///   - url: URL the refresh token endpoint can be found at
-    ///   - clientID: Client ID for the passport configuration
-    ///   - clientSecret: Client secret for the passport configuration
-    public func reauthenticate(url: URL, clientID: String, clientSecret: String) async throws {
-        guard let token = refreshToken else { return }
-        let body = PassportRefreshRequest(refreshToken: token, clientID: clientID, clientSecret: clientSecret)
-        var request = URLRequest(url: url)
+    public func reauthenticate(path: String) async throws {
+        guard case .oAuth(let clientID, let clientSecret) = method else {
+            throw "Method only available for oAuth flow"
+        }
+        guard let token = refreshToken else {
+            try? unauthenticate()
+            return
+        }
+        let body = OAuthRefreshRequest(refreshToken: token, clientID: clientID, clientSecret: clientSecret)
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
         return try await withCheckedThrowingContinuation({ continuation in
-            URLSession.shared.dataTask(with: request) { data, response, error in
+            URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
                 do {
                     guard error == nil else { throw error! }
+                    guard let urlResponse = response as? HTTPURLResponse else { throw "Invalid Response" }
+                    if !Array(200..<300).contains(urlResponse.statusCode) { throw "Refresh token is invalid" }
                     guard let data = data else { throw "Invalid Response" }
-                    let response = try JSONDecoder().decode(SanctumAuthResponse.self, from: data)
-                    try keychain?.setString(response.token, forKey: "bearer_token")
-                    try enclave?.removeObject(forKey: "refresh_token")
+                    let response = try JSONDecoder().decode(OAuthAuthResponse.self, from: data)
+                    try self?.keychain?.setString(response.accessToken, forKey: "bearer_token")
+                    try self?.enclave?.setString(response.refreshToken, forKey: "refresh_token")
+                    self?.setupBearerAuthorization()
+                    continuation.resume()
                 } catch {
+                    try? self?.unauthenticate()
                     continuation.resume(throwing: error)
                 }
             }.resume()
@@ -132,13 +162,9 @@ public struct AuthKit {
     
     // MARK: - Unauthenticate
     /// Unauthenticates the user
-    public func unauthenticatae() throws {
-        try enclave?.removeObject(forKey: "refresh_token")
-        try enclave?.removeObject(forKey: "bearer_token")
-        if let id = try keychain?.string(forKey: "rsa_key_id") {
-            try enclave?.removeObject(forKey: id)
-            try keychain?.removeObject(forKey: "rsa_key_id")
-        }
+    public func unauthenticate() throws {
+        try enclave?.removeAllObjects()
+        try keychain?.removeAllObjects()
         NotificationCenter.default.post(name: .unauthenticated, object: nil)
     }
     
@@ -165,4 +191,29 @@ public struct AuthKit {
         let key = try PublicKey.load(id: uuid, fromEnclave: enclave, prompt: prompt)
         return try key.sign(challenge: challenge)
     }
+    
+    // MARK: - Authorization
+    private func setupBearerAuthorization() {
+        NetShears.shared.startInterceptor()
+        for interceptor in NetShears.shared.modifiedList().enumerated() where interceptor.element is BearerRequestModifier {
+            NetShears.shared.removeModifier(at: interceptor.offset)
+        }
+        guard let token = bearerToken else { return }
+        NetShears.shared.modify(modifier: BearerRequestModifier(url: baseURL, token: token))
+    }
+    
+    private func setupBasicAuthorization(email: String, password: String) {
+        NetShears.shared.startInterceptor()
+        for interceptor in NetShears.shared.modifiedList().enumerated() where interceptor.element is BasicRequestModifier {
+            NetShears.shared.removeModifier(at: interceptor.offset)
+        }
+        NetShears.shared.modify(modifier: BasicRequestModifier(url: baseURL, email: email, password: password))
+    }
+    
+    /// Manually sets auth token
+    /// - Parameter token:
+    public func setBearerToken(to token: String) throws {
+        try keychain?.setString(token, forKey: "bearer_token")
+    }
+    
 }

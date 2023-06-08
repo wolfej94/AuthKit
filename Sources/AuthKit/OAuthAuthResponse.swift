@@ -1,5 +1,5 @@
 //
-//  PassportAuthResponse.swift
+//  OAuthAuthResponse.swift
 //  
 //
 //  Created by James Wolfe on 06/06/2023.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-internal struct PassportAuthResponse: Decodable {
+internal struct OAuthAuthResponse: Decodable {
     
     // MARK: - Variables
     let tokenType: String

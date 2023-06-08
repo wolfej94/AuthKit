@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "AuthKit",
-    platforms: [.iOS(.v13)],
+    platforms: [.iOS(.v14)],
     products: [
         .library(
             name: "AuthKit",
@@ -13,14 +13,12 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/square/Valet", exact: "4.1.3"),
-        .package(url: "https://github.com/krzyzanowskim/CryptoSwift", exact: "1.7.1")
+        .package(url: "https://github.com/krzyzanowskim/CryptoSwift", exact: "1.7.1"),
+        .package(url: "https://github.com/divar-ir/NetShears", exact: "3.4.2")
     ],
     targets: [
         .target(
             name: "AuthKit",
-            dependencies: ["Valet", "CryptoSwift"]),
-        .testTarget(
-            name: "AuthKitTests",
-            dependencies: ["AuthKit"]),
+            dependencies: ["Valet", "CryptoSwift", "NetShears"]),
     ]
 )

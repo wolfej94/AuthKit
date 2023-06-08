@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Verifying your identity...</string>
+	<key>client_id</key>
+	<string>$(client_id)</string>
+	<key>client_secret</key>
+	<string>$(client_secret)</string>
+	<key>url</key>
+	<string>$(url)</string>
+</dict>
+</plist>

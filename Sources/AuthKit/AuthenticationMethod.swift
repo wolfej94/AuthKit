@@ -10,6 +10,7 @@ import Foundation
 public enum AuthenticationMethod {
     
     // MARK: - Cases
-    case sanctum(email: String, password: String)
-    case passport(clientId: String, clientSecret: String)
+    case sanctum
+    case oAuth(clientId: String, clientSecret: String)
+    case basic
 }

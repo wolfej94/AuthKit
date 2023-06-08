@@ -1,0 +1,15 @@
+/* 
+  Localizable.strings
+  Example
+
+  Created by James Wolfe on 07/06/2023.
+  
+*/
+
+
+"LoginView.EmailField.Placeholder" = "Email";
+"LoginView.PasswordField.Placeholder" = "Password";
+"LoginView.LoginButton.Title" = "Login";
+
+"ContentView.RefreshPrompt.Text" = "Verifying your identity...";
+"ContentView.LogoutButton.Title" = "Logout";

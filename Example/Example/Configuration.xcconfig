@@ -1,0 +1,13 @@
+//
+//  Configuration.xcconfig
+//  Example
+//
+//  Created by James Wolfe on 07/06/2023.
+//
+
+// Configuration settings file format documentation can be found at:
+// https://help.apple.com/xcode/#/dev745c5c974
+
+client_id = 1
+client_secret = awd
+url = https:/$()/www.test.com
