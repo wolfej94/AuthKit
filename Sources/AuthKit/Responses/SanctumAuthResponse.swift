@@ -1,5 +1,5 @@
 //
-//  SanctumAuthResponse.swift
+//  FeatherweightAuthResponse.swift
 //  
 //
 //  Created by James Wolfe on 06/06/2023.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct SanctumAuthResponse: Decodable {
+internal struct FeatherweightAuthResponse: Decodable {
     
     // MARK: - Variables
     let token: String

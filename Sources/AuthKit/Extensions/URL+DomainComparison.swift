@@ -7,9 +7,9 @@
 
 import Foundation
 
-extension URL {
+internal extension URL {
     
-    public func hasSameDomain(as url: URL) -> Bool {
+    func hasSameDomain(as url: URL) -> Bool {
         guard let lhs = URLComponents(url: self, resolvingAgainstBaseURL: false) else { return false }
         guard let rhs = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return false }
         return lhs.host == rhs.host

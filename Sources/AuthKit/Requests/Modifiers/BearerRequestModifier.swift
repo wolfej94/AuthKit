@@ -1,24 +1,22 @@
 //
-//  BasicRequestModifier.swift
+//  BearerRequestModifier.swift
 //  
 //
-//  Created by James Wolfe on 08/06/2023.
+//  Created by James Wolfe on 07/06/2023.
 //
 
 import Foundation
 import NetShears
 
-struct BasicRequestModifier: RequestEvaluatorModifier, Equatable {
+internal struct BearerRequestModifier: RequestEvaluatorModifier, Equatable {
     
     // MARK: - Variables
     let url: URL
-    let email: String
-    let password: String
+    let token: String
     
     // MARK: - RequestEvaluatorModifier
     func modify(request: inout URLRequest) {
-        guard let data = "\(email):\(password)".data(using: .utf8) else { return }
-        request.addValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
+        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
     
     func isActionAllowed(urlRequest: URLRequest) -> Bool {

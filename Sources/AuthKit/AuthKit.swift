@@ -66,7 +66,7 @@ public class AuthKit {
         switch method {
         case .oAuth(let clientId, let clientSecret):
             try await authenticate(path: path, body: .init(username: email, password: password, clientID: clientId, clientSecret: clientSecret))
-        case .sanctum:
+        case .featherweight:
             try await authenticate(path: path, body: .init(email: email, password: password))
         case .basic:
             self.method = .basic
@@ -99,7 +99,7 @@ public class AuthKit {
         })
     }
     
-    private func authenticate(path: String, body: SanctumAuthRequest) async throws {
+    private func authenticate(path: String, body: FeatherweightAuthRequest) async throws {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -111,7 +111,7 @@ public class AuthKit {
                     guard let urlResponse = response as? HTTPURLResponse else { throw "Invalid Response" }
                     if !Array(200..<300).contains(urlResponse.statusCode) { throw "Email address or password was incorrect." }
                     guard let data = data else { throw "Invalid Response" }
-                    let response = try JSONDecoder().decode(SanctumAuthResponse.self, from: data)
+                    let response = try JSONDecoder().decode(FeatherweightAuthResponse.self, from: data)
                     try self?.keychain?.setString(response.token, forKey: "bearer_token")
                     self?.setupBearerAuthorization()
                     try self?.enclave?.removeObject(forKey: "refresh_token")
