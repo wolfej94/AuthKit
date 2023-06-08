@@ -1,5 +1,3 @@
-Certainly! Here's the updated README document with "Featherweight" replacing "Sanctum":
-
 # AuthKit
 
 AuthKit is a powerful authentication framework that provides easy-to-use methods for user authentication in your iOS application. It supports various authentication methods such as OAuth, Featherweight, and basic authentication.
