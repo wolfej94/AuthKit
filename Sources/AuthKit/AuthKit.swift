@@ -215,6 +215,7 @@ public class AuthKit {
     public func setBearerToken(to token: String) throws {
         try keychain?.setString(token, forKey: "bearer_token")
         setupBearerAuthorization()
+        NotificationCenter.default.post(name: .authenticated, object: nil)
     }
     
 }
