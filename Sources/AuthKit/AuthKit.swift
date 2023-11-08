@@ -214,6 +214,7 @@ public class AuthKit {
     /// - Parameter token:
     public func setBearerToken(to token: String) throws {
         try keychain?.setString(token, forKey: "bearer_token")
+        setupBearerAuthorization()
     }
     
 }
