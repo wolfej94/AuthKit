@@ -75,6 +75,20 @@ public class AuthKit {
         NotificationCenter.default.post(name: .authenticated, object: nil)
     }
     
+    // MARK: - Authenticate With Response
+    /// Authenticates a user and returns a custom response of the specified type.
+    ///
+    /// - Parameters:
+    ///   - path: URL path the refresh token endpoint can be found at
+    ///   - email: Email for the user
+    ///   - password: Password for the user
+    ///   - responseType: The custom `Decodable` type to decode the response into.
+    /// - Returns: An instance of the specified `responseType` if successful, otherwise `nil`.
+    /// - Throws: An error if the authentication request fails or if the response cannot be decoded.
+    public func authenticateWithResponse<CustomAuthResponse: Decodable>(path: String, email: String, password: String, responseType: CustomAuthResponse.Type) async throws -> CustomAuthResponse? {
+        return try await authenticate(path: path, body: .init(email: email, password: password), responseType: responseType)
+    }
+
     private func authenticate(path: String, body: OAuthAuthRequest) async throws {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = "POST"
@@ -123,6 +137,27 @@ public class AuthKit {
         })
     }
     
+    private func authenticate<Response: Decodable>(path: String, body: FeatherweightAuthRequest, responseType: Response.Type) async throws -> Response {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(body)
+        return try await withCheckedThrowingContinuation({ continuation in
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                do {
+                    guard error == nil else { throw error! }
+                    guard let urlResponse = response as? HTTPURLResponse else { throw "Invalid Response" }
+                    if !Array(200..<300).contains(urlResponse.statusCode) { throw "Email address or password was incorrect." }
+                    guard let data = data else { throw "Invalid Response" }
+                    let response = try JSONDecoder().decode(responseType, from: data)
+                    continuation.resume(returning: response)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }.resume()
+        })
+    }
+
     // MARK: - Reauthenticate
     /// Reauthenticates user using oAuth refresh token
     /// - Parameters:
