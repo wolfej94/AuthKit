@@ -253,4 +253,10 @@ public class AuthKit {
         NotificationCenter.default.post(name: .authenticated, object: nil)
     }
     
+    /// Manually sets refresh token
+    /// - Parameter refreshToken:
+    public func setRefreshToken(to refreshToken: String) throws {
+        try enclave?.setString(refreshToken, forKey: "refresh_token")
+    }
+
 }
