@@ -259,4 +259,13 @@ public class AuthKit {
         try enclave?.setString(refreshToken, forKey: "refresh_token")
     }
 
+    /// Get refresh token
+    public func getRefreshToken() -> String? {
+        guard let token = refreshToken else {
+            try? unauthenticate()
+            return nil
+        }
+        return token
+    }
+
 }
