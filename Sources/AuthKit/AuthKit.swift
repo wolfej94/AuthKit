@@ -18,7 +18,7 @@ public class AuthKit {
     private let baseURL: URL
     private var method: AuthenticationMethod
     
-    internal var bearerToken: String? {
+    public var bearerToken: String? {
         return try? keychain?.string(forKey: "bearer_token")
     }
     
